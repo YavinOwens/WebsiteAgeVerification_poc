@@ -9,6 +9,7 @@ import json
 import time
 import requests
 import urllib3
+import random
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -57,126 +58,295 @@ class AgeVerificationAuditor:
         self.setup_driver()
         
     def setup_driver(self):
-        """Setup Selenium WebDriver for browser automation"""
+        """Setup Selenium WebDriver with enhanced headless detection evasion"""
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from selenium.webdriver.chrome.options import Options
+        import os
+        import ssl
+        import random
+        
+        # Disable SSL verification at the Python level
+        ssl._create_default_https_context = ssl._create_unverified_context
+        
+        # Configure Chrome options with extensive evasion techniques
         chrome_options = Options()
-        chrome_options.add_argument("--headless")
+        
+        # Standard headless options
+        chrome_options.add_argument("--headless=new")  # New headless mode is less detectable
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--remote-debugging-port=9222")
+        
+        # Set a random viewport size to appear more human-like
+        width = random.randint(1200, 1920)
+        height = random.randint(800, 1080)
+        chrome_options.add_argument(f"--window-size={width},{height}")
+        
+        # Disable automation flags
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        
+        # Disable various automation signals
+        chrome_options.add_argument("--disable-infobars")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-popup-blocking")
+        chrome_options.add_argument("--disable-notifications")
+        chrome_options.add_argument("--disable-save-password-bubble")
+        chrome_options.add_argument("--disable-single-click-autofill")
+        chrome_options.add_argument("--disable-translate")
+        
+        # SSL and security settings
+        chrome_options.add_argument("--ignore-certificate-errors")
+        chrome_options.add_argument("--allow-running-insecure-content")
+        chrome_options.add_argument("--allow-insecure-localhost")
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument('--ignore-ssl-errors=yes')
+        chrome_options.add_argument('--accept-insecure-certs')
+        
+        # Language and location settings
+        chrome_options.add_argument("--lang=en-US,en;q=0.9")
+        
+        # Set a common user agent that changes with each run
+        user_agents = [
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.1 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
+        ]
+        chrome_options.add_argument(f'user-agent={random.choice(user_agents)}')
         
         try:
-            service = Service(ChromeDriverManager().install())
+            # Try using the Homebrew-installed chromedriver
+            service = ChromeService(executable_path="/opt/homebrew/bin/chromedriver")
+            
+            # Initialize the WebDriver with service and options
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # Set reasonable timeouts
+            self.driver.set_page_load_timeout(30)
+            self.driver.set_script_timeout(30)
+            
+            # Execute CDP commands to further evade detection
+            self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+                "userAgent": chrome_options.arguments[-1].split('=', 1)[1],
+                "platform": "Win32"
+            })
+            
+            # Override the navigator properties
+            self.driver.execute_script("""
+                // Override the plugins property to use a more common fingerprint
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5],
+                });
+                
+                // Override the languages property
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en'],
+                });
+                
+                // Override the webdriver property
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined,
+                });
+                
+                // Override the chrome object
+                window.chrome = {
+                    runtime: {},
+                    // Add other chrome properties as needed
+                };
+            """)
+            
+            # Set additional CDP parameters
+            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': '''
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                    window.navigator.chrome = {
+                        runtime: {},
+                        // etc.
+                    };
+                '''
+            })
+            
+            # Set geolocation and timezone to common values
+            params = {
+                'latitude': 51.5074,
+                'longitude': -0.1278,
+                'accuracy': 100
+            }
+            self.driver.execute_cdp_cmd('Emulation.setGeolocationOverride', params)
+            
+            # Set timezone
+            self.driver.execute_cdp_cmd('Emulation.setTimezoneOverride', {
+                'timezoneId': 'Europe/London'
+            })
+            
+            print(f"{Fore.GREEN}Successfully initialized Chrome driver with enhanced anti-detection.{Style.RESET_ALL}")
+            
         except Exception as e:
-            print(f"{Fore.YELLOW}Warning: Could not initialize Chrome driver: {str(e)}{Style.RESET_ALL}")
-            print(f"{Fore.YELLOW}Will use requests-based scraping instead{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}Warning: Could not initialize Chrome driver. Error: {e}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}Falling back to requests-based scraping with SSL verification disabled.{Style.RESET_ALL}")
             self.driver = None
         
-    def get_website_content(self, url: str) -> Tuple[str, str]:
+    def get_website_content(self, url: str, max_retries: int = 3) -> Tuple[str, str]:
         """
-        Get website content using Selenium or requests with SSL error handling
+        Get website content using Selenium or requests with anti-bot bypass
         
         Args:
             url: Website URL to analyze
+            max_retries: Maximum number of retry attempts
             
         Returns:
-            Tuple of (page_source, page_text)
+            Tuple of (page_source, final_url)
         """
-        try:
-            if self.driver:
-                # Use Selenium if available
-                self.driver.get(url)
-                time.sleep(3)  # Wait for page to load
-                
-                # Get page source
-                page_source = self.driver.page_source
-            else:
-                # Fallback to requests with SSL error handling
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                }
-                
-                # Try multiple approaches for SSL issues
+        # Common browser user agents
+        user_agents = [
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.1 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
+        ]
+        
+        # Common headers
+        headers = {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'DNT': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'Referer': 'https://www.google.com/'
+        }
+        
+        # Try with Selenium first if available
+        if self.driver is not None:
+            for attempt in range(max_retries):
+                try:
+                    print(f"{Fore.CYAN}Attempt {attempt + 1}/{max_retries}: Fetching {url} using Selenium...{Style.RESET_ALL}")
+                    
+                    # Rotate user agent
+                    user_agent = user_agents[attempt % len(user_agents)]
+                    self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": user_agent})
+                    
+                    # Add random delay to appear more human-like
+                    time.sleep(random.uniform(1.0, 3.0))
+                    
+                    # Configure Chrome to ignore SSL errors
+                    self.driver.execute_cdp_cmd('Network.setIgnoreCertificateErrors', {'ignore': True})
+                    
+                    # Navigate to the page with JavaScript disabled first to avoid bot detection
+                    try:
+                        self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                        self.driver.get('about:blank')
+                        self.driver.execute_script("window.open('')")
+                        self.driver.switch_to.window(self.driver.window_handles[-1])
+                    except:
+                        pass
+                    
+                    # Now try to load the actual URL
+                    self.driver.get(url)
+                    
+                    # Wait for JavaScript to execute with random delay
+                    time.sleep(random.uniform(2.0, 5.0))
+                    
+                    # Get page source and check for anti-bot measures
+                    page_source = self.driver.page_source.lower()
+                    current_url = self.driver.current_url
+                    
+                    # Check for common anti-bot measures
+                    if any(term in page_source for term in ['bot', 'captcha', 'security', 'access denied', 'forbidden', 'cloudflare']):
+                        print(f"{Fore.YELLOW}Warning: Possible anti-bot measure detected{Style.RESET_ALL}")
+                        if attempt < max_retries - 1:
+                            continue
+                    
+                    # Check if we got a valid response
+                    if not page_source or len(page_source) < 100:
+                        print(f"{Fore.YELLOW}Warning: Received empty or very small page{Style.RESET_ALL}")
+                        if attempt < max_retries - 1:
+                            continue
+                    
+                    if "404" in self.driver.title.lower() or "not found" in page_source:
+                        print(f"{Fore.YELLOW}Warning: Page not found (404) for {url}{Style.RESET_ALL}")
+                        return "", current_url
+                    
+                    return page_source, current_url
+                    
+                except Exception as e:
+                    print(f"{Fore.YELLOW}Attempt {attempt + 1} failed: {str(e)}{Style.RESET_ALL}")
+                    if attempt == max_retries - 1:
+                        print(f"{Fore.RED}All Selenium attempts failed, falling back to requests{Style.RESET_ALL}")
+                        try:
+                            self.driver.quit()
+                        except:
+                            pass
+                        self.driver = None
+                    else:
+                        # Wait before retry with exponential backoff
+                        time.sleep(2 ** attempt)
+        
+        # Fall back to requests with rotating user agents and retries
+        for attempt in range(max_retries):
+            try:
+                # Create a new session for each attempt
                 session = requests.Session()
+                session.verify = False  # Disable SSL verification
                 
-                # Configure session for better SSL handling
-                session.verify = False
-                session.trust_env = False
+                # Disable SSL warnings for requests
+                requests.packages.urllib3.disable_warnings()
                 
-                # Try multiple user agents and approaches
-                user_agents = [
-                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                ]
+                # Set headers with rotating user agent
+                headers['User-Agent'] = user_agents[attempt % len(user_agents)]
                 
-                for user_agent in user_agents:
-                    try:
-                        headers['User-Agent'] = user_agent
-                        response = session.get(url, headers=headers, timeout=20, verify=False)
-                        response.raise_for_status()
-                        break
-                    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                print(f"{Fore.CYAN}Attempt {attempt + 1}/{max_retries}: Falling back to requests for {url}...{Style.RESET_ALL}")
+                
+                # Try with verify=False to bypass SSL verification
+                response = session.get(
+                    url,
+                    headers=headers,
+                    timeout=15,
+                    verify=False,  # Disable SSL verification
+                    allow_redirects=True
+                )
+                
+                # Check for common anti-bot measures in response
+                if any(term in response.text.lower() for term in ['bot', 'captcha', 'security', 'access denied', 'forbidden', 'cloudflare']):
+                    print(f"{Fore.YELLOW}Warning: Possible anti-bot measure detected{Style.RESET_ALL}")
+                    if attempt < max_retries - 1:
                         continue
-                else:
-                    # If all attempts failed, try with a different approach
-                    try:
-                        import ssl
-                        ssl_context = ssl.create_default_context()
-                        ssl_context.check_hostname = False
-                        ssl_context.verify_mode = ssl.CERT_NONE
-                        
-                        # Create a custom adapter
-                        from requests.adapters import HTTPAdapter
-                        from urllib3.util.ssl_ import create_urllib3_context
-                        
-                        class CustomHTTPAdapter(HTTPAdapter):
-                            def init_poolmanager(self, *args, **kwargs):
-                                context = create_urllib3_context()
-                                context.check_hostname = False
-                                context.verify_mode = ssl.CERT_NONE
-                                kwargs['ssl_context'] = context
-                                return super().init_poolmanager(*args, **kwargs)
-                        
-                        session.mount('https://', CustomHTTPAdapter())
-                        response = session.get(url, headers=headers, timeout=20, verify=False)
-                        response.raise_for_status()
-                    except Exception:
-                        raise requests.exceptions.SSLError(f"All SSL connection attempts failed for {url}")
                 
-                page_source = response.text
-            
-            # Extract text content
-            soup = BeautifulSoup(page_source, 'html.parser')
-            
-            # Remove script and style elements
-            for script in soup(["script", "style"]):
-                script.decompose()
+                response.raise_for_status()
                 
-            page_text = soup.get_text()
+                # Check if we got a valid response
+                if not response.text or len(response.text) < 100:
+                    print(f"{Fore.YELLOW}Warning: Received empty or very small page{Style.RESET_ALL}")
+                    if attempt < max_retries - 1:
+                        continue
+                
+                return response.text, response.url
+                
+            except requests.exceptions.SSLError as e:
+                print(f"{Fore.YELLOW}SSL Error: {str(e)}{Style.RESET_ALL}")
+                if attempt == max_retries - 1:
+                    return "", f"SSL Error: {str(e)}"
             
-            return page_source, page_text
-            
-        except Exception as e:
-            error_msg = str(e)
-            if "SSL" in error_msg:
-                print(f"{Fore.YELLOW}SSL Error accessing {url}: Site may be blocked or have certificate issues{Style.RESET_ALL}")
-            elif "403" in error_msg:
-                print(f"{Fore.YELLOW}Access Forbidden for {url}: Site may block automated requests{Style.RESET_ALL}")
-            elif "404" in error_msg:
-                print(f"{Fore.YELLOW}Page Not Found for {url}: Site may be down or moved{Style.RESET_ALL}")
-            elif "timeout" in error_msg.lower():
-                print(f"{Fore.YELLOW}Timeout accessing {url}: Site may be slow or overloaded{Style.RESET_ALL}")
-            else:
-                print(f"{Fore.RED}Error accessing {url}: {error_msg}{Style.RESET_ALL}")
-            return "", ""
+            except requests.exceptions.RequestException as e:
+                print(f"{Fore.YELLOW}Attempt {attempt + 1} failed: {str(e)}{Style.RESET_ALL}")
+                if attempt == max_retries - 1:
+                    return "", f"Request failed: {str(e)}"
+                
+                # Exponential backoff
+                time.sleep(2 ** attempt)
+        
+        return "", "All attempts failed"
     
     def analyze_with_ollama(self, url: str, page_text: str) -> Dict:
         """
