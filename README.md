@@ -6,10 +6,9 @@ A Python workflow that uses the Ollama SDK to search for and test websites for a
 
 - 🔍 **AI-Powered Analysis**: Uses Ollama SDK with LLM models to intelligently analyze website content
 - 🌐 **Multi-Category Testing**: Pre-configured categories for alcohol, gambling, adult content, social media, tobacco, and gaming websites
-- 📸 **Screenshot Capture**: Automatically captures screenshots of audited websites
-- 📊 **Comprehensive Reporting**: Exports results in both CSV and JSON formats
-- 🎨 **Beautiful CLI**: Color-coded command-line interface with progress tracking
-- ⚡ **Fast & Efficient**: Parallel processing and optimized web scraping
+- 📸 **Screenshot Capture**: Automatically captures screenshots of audited websites ("In progress")
+- 📊 **CSV Reporting**: Exports results in both CSV and JSON formats
+- 🎨 **CLI**: Color-coded command-line interface with progress tracking
 - 🔧 **Flexible Configuration**: Easy-to-modify settings and website categories
 
 ## Prerequisites
@@ -248,4 +247,6 @@ For issues and questions:
 
 ---
 
-**Note**: This tool analyzes publicly accessible website content. Always comply with applicable laws and website terms of service when conducting audits. 
+**Note**: This tool analyses publicly accessible website content. Always comply with applicable laws and website terms of service when conducting audits. 
+
+additionally this is for learning purposes and should not be used for malicious purposes.
